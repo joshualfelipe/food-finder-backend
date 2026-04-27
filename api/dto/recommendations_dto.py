@@ -7,6 +7,15 @@ class PlacesRequest(BaseModel):
     longitude: float
 
 
+class PlacesFilter(BaseModel):
+    radius: int | None
+    min_price: int | None
+    max_price: int | None
+    open_now: bool | None
+    category_ids: List[str] | None
+    limit: int | None
+
+
 class FourSquarePlacesRequest(BaseModel):
     ll: str  # latitude,longitude
     radius: int  # in meters
@@ -15,6 +24,11 @@ class FourSquarePlacesRequest(BaseModel):
     max_price: int | None
     open_now: bool
     limit: int
+
+
+class AIRecommendations(BaseModel):
+    name: str
+    reason: str
 
 
 class Place(BaseModel):
@@ -28,6 +42,8 @@ class Place(BaseModel):
     rating: float | None
 
 
-class PlacesResponse(BaseModel):
-    places: List[Place]
-    count: int
+class RestaurantRecommendationsResponse(BaseModel):
+    ai_recommendations: AIRecommendations | None
+    restaurants: List[Place] | None
+    count: int | None
+    message: str
