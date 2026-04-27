@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     FOURSQUARE_BASE_URL: str
     FOURSQUARE_X_PLACES_API_VERSION: str
     OPENAI_BASE_URL: str
+    OPENAI_API_KEY: str
 
     model_config = SettingsConfigDict(env_file="../.env")
 
