@@ -7,7 +7,7 @@ from dto.recommendations_dto import (
 )
 import httpx
 from config import settings
-from api.handler import ai_recommendations_handler
+from handler import ai_recommendations_handler
 
 
 async def recommendations(
