@@ -34,10 +34,12 @@ async def recommendations(
     if restaurants_in_the_area is None:
         return {"message": "No restaurants found."}
 
+    raw_restaurant_data = strip_raw_restaurant_data(restaurants_in_the_area)
+
     # TODO: implement conversation history for future memory implementation
     ai_response, _ = ai_chat_recommendations_handler.chat_food_recommendations(
         message,
-        restaurants_in_the_area,
+        raw_restaurant_data,
         None,
     )
 
@@ -49,6 +51,18 @@ async def recommendations(
         "count": len(formatted_restaurant_data),
         "message": "Recommendations fetched successfully.",
     }
+
+
+def strip_raw_restaurant_data(restaurant_data: list) -> list:
+    return [
+        {
+            "name": item.get("name"),
+            "distance": item.get("distance"),
+            "type": item.get("categories", [{}])[0].get("name", "").lower(),
+            "address": item.get("location", {}).get("formatted_address", ""),
+        }
+        for item in restaurant_data
+    ]
 
 
 async def fetch_fsq_places(params: FourSquarePlacesRequest) -> list:
