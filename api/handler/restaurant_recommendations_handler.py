@@ -7,7 +7,7 @@ from dto.recommendations_dto import (
 )
 import httpx
 from config import settings
-from handler import ai_chat_recommendations_handler
+from api.handler import ai_recommendations_handler
 
 
 async def recommendations(
@@ -37,7 +37,7 @@ async def recommendations(
     raw_restaurant_data = strip_raw_restaurant_data(restaurants_in_the_area)
 
     # TODO: implement conversation history for future memory implementation
-    ai_response, _ = ai_chat_recommendations_handler.chat_food_recommendations(
+    ai_response, _ = ai_recommendations_handler.chat_food_recommendations(
         message,
         raw_restaurant_data,
         None,
