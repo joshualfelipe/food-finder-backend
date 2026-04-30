@@ -1,7 +1,7 @@
+from dto.openai_dto import OpenAIChatRequestDTO
 import json
 from prompt import AI_RECOMMENDATION_PROMPT
 from service import openai_service
-from dto.openai_dto import OpenAIChatRequestDTO
 
 
 def chat_food_recommendations(

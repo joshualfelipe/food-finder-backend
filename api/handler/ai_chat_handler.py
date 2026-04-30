@@ -1,7 +1,7 @@
+from dto.openai_dto import OpenAIChatRequestDTO
 from prompt import PARAMETER_MATCHING_PROMPT, ALL_VALID_FEATURES
 from service import openai_service
 import json
-from dto.openai_dto import OpenAIChatRequestDTO
 
 
 def resolve_search_parameters(user_message: str) -> list[str]:

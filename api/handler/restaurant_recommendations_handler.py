@@ -1,79 +1,62 @@
-from dto.recommendations_dto import (
-    PlacesRequest,
-    Place,
-    RestaurantRecommendationsResponse,
-    PlacesFilter,
-)
-from dto.fsq_dto import FourSquarePlacesRequest
-import httpx
 from config import settings
-from handler import ai_recommendations_handler
-from service import fsq_service
+from dto.geoapify_dto import GeoapifyParamsDTO
+from dto.recommendations_dto import PlacesRequest
+from handler import ai_recommendations_handler, ai_chat_handler
+from haversine import haversine, Unit
+from service import geoapify_service
 
 
 async def recommendations(
     request: PlacesRequest,
-    message: str | None = None,
-    filters: PlacesFilter | None = None,
-) -> RestaurantRecommendationsResponse:
-    params: FourSquarePlacesRequest = {
-        "ll": f"{request.latitude},{request.longitude}",
-        "radius": filters.radius if filters.radius else 1000,
-        "fsq_category_ids": (
-            filters.category_ids
-            if filters.category_ids
-            else ["63be6904847c3692a84b9bb5"]
-        ),
-        "min_price": filters.min_price if filters.min_price else 1,
-        "max_price": filters.max_price if filters.max_price else 4,
-        "open_now": filters.open_now if filters.open_now is not None else False,
-        "limit": filters.limit if filters.limit else 25,
-    }
+    user_message: str | None = None,
+):
+    features = ai_chat_handler.resolve_search_parameters(user_message)
 
-    restaurants_in_the_area = await fsq_service.fsq_conn(params)
+    params = GeoapifyParamsDTO(
+        lat=request.latitude,
+        lon=request.longitude,
+        features=features,
+        apiKey=settings.GEOAPIFY_API_KEY,
+    )
 
-    if restaurants_in_the_area is None:
-        return {"message": "No restaurants found."}
+    response = await geoapify_service.geoapify_conn(params)
 
-    raw_restaurant_data = strip_raw_restaurant_data(restaurants_in_the_area)
+    restaurants_features = response.json().get("features", [])[1:]
+    origin = (request.latitude, request.longitude)
+    restaurants = []
 
-    # TODO: implement conversation history for future memory implementation
+    for feature in restaurants_features:
+        props = feature.get("properties") or {}
+
+        name = props.get("name")
+        lat = props.get("lat")
+        lon = props.get("lon")
+        if not name:
+            continue
+
+        catering = props.get("catering") or {}
+        facilities = props.get("facilities") or {}
+        distance_m = haversine(origin, (lat, lon), unit=Unit.METERS)
+
+        restaurant_data = {
+            "name": name,
+            "catering_cuisine": catering.get("cuisine"),
+            "categories": props.get("categories", []),
+            "facilities_takeaway": facilities.get("takeaway"),
+            "distance_m": distance_m,
+        }
+
+        restaurants.append(restaurant_data)
+
     ai_response, _ = ai_recommendations_handler.chat_food_recommendations(
-        message,
-        raw_restaurant_data,
+        user_message,
+        restaurants,
         None,
     )
 
-    formatted_restaurant_data = list(map(map_place, restaurants_in_the_area))
-
     return {
         "ai_recommendations": ai_response,
-        "restaurants": formatted_restaurant_data,
-        "count": len(formatted_restaurant_data),
+        "restaurants": restaurants,
+        "count": len(restaurants),
         "message": "Recommendations fetched successfully.",
     }
-
-
-def strip_raw_restaurant_data(restaurant_data: list) -> list:
-    return [
-        {
-            "name": item.get("name"),
-            "distance": item.get("distance"),
-            "type": item.get("categories", [{}])[0].get("name", "").lower(),
-            "address": item.get("location", {}).get("formatted_address", ""),
-        }
-        for item in restaurant_data
-    ]
-
-
-def map_place(item: dict) -> Place:
-    return Place(
-        latitude=item.get("latitude"),
-        longitude=item.get("longitude"),
-        name=item.get("name"),
-        address=item.get("location", {}).get("formatted_address"),
-        description=item.get("description", ""),
-        distance=item.get("distance"),
-        price=item.get("price"),
-        rating=item.get("rating"),
-    )

@@ -1,16 +1,25 @@
-from fastapi import APIRouter
 from dto.recommendations_dto import PlacesRequest, PlacesFilter
+from fastapi import APIRouter
 from handler import (
     restaurant_recommendations_handler,
-    geoapify_handler,
-    ai_chat_handler,
+    restaurant_recommendations_v1_handler,
 )
 
-router = APIRouter(tags=["Places"])
+router = APIRouter(tags=["Recommendations"])
 
 
-@router.get("/recommendations")
-async def recommendations(
+@router.get("/v2/recommendations")
+async def geoapify_recommendations(
+    latitude: float, longitude: float, user_message: str | None = None
+):
+    location = PlacesRequest(latitude=latitude, longitude=longitude)
+    return await restaurant_recommendations_handler.recommendations(
+        location, user_message
+    )
+
+
+@router.get("/v1/recommendations")
+async def fsq_recommendations(
     latitude: float,
     longitude: float,
     user_message: str | None = None,
@@ -30,20 +39,6 @@ async def recommendations(
         category_ids=category_ids.split(",") if category_ids else None,
         limit=limit,
     )
-    return await restaurant_recommendations_handler.recommendations(
+    return await restaurant_recommendations_v1_handler.recommendations(
         location, user_message, filters
     )
-
-
-@router.get("/geoapify")
-async def geoapify(latitude: float, longitude: float, user_message: str | None = None):
-    features = ai_chat_handler.resolve_search_parameters(user_message)
-    location = PlacesRequest(latitude=latitude, longitude=longitude)
-    return await geoapify_handler.fetch_geoapify_places(
-        location, user_message, features
-    )
-
-
-@router.get("/test/chat")
-async def test_chat_recommendations(user_message: str):
-    return ai_chat_handler.resolve_search_parameters(user_message)

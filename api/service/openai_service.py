@@ -1,6 +1,6 @@
-from openai import OpenAI
 from config import settings
 from dto.openai_dto import OpenAIChatRequestDTO
+from openai import OpenAI
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 

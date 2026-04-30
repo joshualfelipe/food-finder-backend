@@ -1,7 +1,7 @@
-from openai import OpenAI
 from config import settings
-import json
+from openai import OpenAI
 from prompt import SYSTEM_PROMPT
+import json
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
