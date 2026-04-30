@@ -42,16 +42,16 @@ class TestPlaces:
             return self.ai_recommendation, []
 
         mocker.patch(
-            "handler.restaurant_recommendations_handler.fetch_fsq_places",
+            "handler.restaurant_recommendations_v1_handler.fsq_service.fsq_conn",
             new=mock_fetch_fsq_places,
         )
         mocker.patch(
-            "handler.ai_chat_recommendations_handler.chat_food_recommendations",
+            "handler.restaurant_recommendations_v1_handler.ai_recommendations_handler.chat_food_recommendations",
             new=mock_chat_food_recommendations,
         )
 
         response = client.get(
-            f"/recommendations?latitude={self.latitude}&longitude={self.longitude}&user_message={self.user_message}&radius={self.radius}&min_price={self.min_price}&max_price={self.max_price}&open_now={self.open_now}&category_ids={self.category_ids}&limit={self.limit}"
+            f"/v1/recommendations?latitude={self.latitude}&longitude={self.longitude}&user_message={self.user_message}&radius={self.radius}&min_price={self.min_price}&max_price={self.max_price}&open_now={self.open_now}&category_ids={self.category_ids}&limit={self.limit}"
         )
 
         assert response.status_code == 200
@@ -76,6 +76,74 @@ class TestPlaces:
         assert data["restaurants"][0]["distance"] == 500
         assert data["restaurants"][0]["price"] == 100
         assert data["restaurants"][0]["rating"] == 3.5
+
+        # Test for the count of restaurants returned
+        assert data["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_places_v2_with_one_result(self, client, mocker):
+        """Test the `/v2/recommendations` endpoint with mocked dependencies."""
+
+        class MockGeoapifyResponse:
+            def json(self):
+                return {
+                    "features": [
+                        {"properties": {"name": "Origin Point"}},
+                        {
+                            "properties": {
+                                "name": "Budget Bites",
+                                "lat": 14.4735,
+                                "lon": 120.9975,
+                                "catering": {"cuisine": "burger"},
+                                "categories": ["catering.restaurant"],
+                                "facilities": {"takeaway": True},
+                            }
+                        },
+                    ]
+                }
+
+        def mock_resolve_search_parameters(*args, **kwargs):
+            return ["catering.restaurant"]
+
+        async def mock_geoapify_conn(*args, **kwargs):
+            return MockGeoapifyResponse()
+
+        def mock_chat_food_recommendations(*args, **kwargs):
+            return self.ai_recommendation, []
+
+        mocker.patch(
+            "handler.restaurant_recommendations_handler.ai_chat_handler.resolve_search_parameters",
+            new=mock_resolve_search_parameters,
+        )
+        mocker.patch(
+            "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
+            new=mock_geoapify_conn,
+        )
+        mocker.patch(
+            "handler.restaurant_recommendations_handler.ai_recommendations_handler.chat_food_recommendations",
+            new=mock_chat_food_recommendations,
+        )
+
+        response = client.get(
+            f"/v2/recommendations?latitude={self.latitude}&longitude={self.longitude}&user_message={self.user_message}"
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Test for the AI recommendation content
+        assert data["ai_recommendations"]["name"] == "Budget Bites"
+        assert (
+            data["ai_recommendations"]["reason"]
+            == "Budget Bites offers affordable meals that are perfect for those looking for a quick and cheap dining option."
+        )
+
+        # Test for the restaurant details returned
+        assert data["restaurants"][0]["name"] == "Budget Bites"
+        assert data["restaurants"][0]["catering_cuisine"] == "burger"
+        assert data["restaurants"][0]["categories"] == ["catering.restaurant"]
+        assert data["restaurants"][0]["facilities_takeaway"] is True
+        assert data["restaurants"][0]["distance_m"] > 0
 
         # Test for the count of restaurants returned
         assert data["count"] == 1
