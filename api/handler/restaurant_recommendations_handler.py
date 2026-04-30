@@ -8,6 +8,7 @@ from dto.recommendations_dto import (
 import httpx
 from config import settings
 from handler import ai_recommendations_handler
+from service import fsq_service
 
 
 async def recommendations(
@@ -29,7 +30,7 @@ async def recommendations(
         "limit": filters.limit if filters.limit else 25,
     }
 
-    restaurants_in_the_area = await fetch_fsq_places(params)
+    restaurants_in_the_area = await fsq_service.fsq_conn(params)
 
     if restaurants_in_the_area is None:
         return {"message": "No restaurants found."}
@@ -63,20 +64,6 @@ def strip_raw_restaurant_data(restaurant_data: list) -> list:
         }
         for item in restaurant_data
     ]
-
-
-async def fetch_fsq_places(params: FourSquarePlacesRequest) -> list:
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            f"{settings.FOURSQUARE_BASE_URL}",
-            params=params,
-            headers={
-                "X-Places-Api-Version": settings.FOURSQUARE_X_PLACES_API_VERSION,
-                "authorization": f"Bearer {settings.FOURSQUARE_API_KEY}",
-            },
-        )
-
-        return [item for item in response.json().get("results", [])]
 
 
 def map_place(item: dict) -> Place:

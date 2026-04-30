@@ -1,10 +1,11 @@
 from dto.recommendations_dto import (
     PlacesRequest,
 )
-import httpx
+from dto.geoapify_dto import GeoapifyParamsDTO
 from config import settings
 from haversine import haversine, Unit
 from handler import ai_recommendations_handler
+from service import geoapify_service
 
 
 async def fetch_geoapify_places(
@@ -12,17 +13,14 @@ async def fetch_geoapify_places(
     user_message: str | None = None,
     features: list[str] | None = None,
 ):
-    params = {
-        "lat": request.latitude,
-        "lon": request.longitude,
-        "features": features,
-        "apiKey": settings.GEOAPIFY_API_KEY,
-    }
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            f"{settings.GEOAPIFY_BASE_URL}",
-            params=params,
-        )
+    params = GeoapifyParamsDTO(
+        lat=request.latitude,
+        lon=request.longitude,
+        features=features,
+        apiKey=settings.GEOAPIFY_API_KEY,
+    )
+
+    response = await geoapify_service.geoapify_conn(params)
 
     features = response.json().get("features", [])
     restaurants_data = features[1:]

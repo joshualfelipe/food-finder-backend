@@ -1,29 +1,22 @@
 from prompt_chat import PARAMETER_MATCHING_PROMPT, ALL_VALID_FEATURES
-from config import settings
-from openai import OpenAI
+from service import openai_service
 import json
-
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
-PARAMETER_MATCHING_CONFIG = {
-    "model": "gpt-5.4-nano",
-    "temperature": 0.0,
-    "max_completion_tokens": 80,
-    "top_p": 1.0,
-    "response_format": {"type": "json_object"},
-}
+from dto.openai_dto import OpenAIChatRequestDTO
 
 
 def resolve_search_parameters(user_message: str) -> list[str]:
     DEFAULT_FEATURES = ["radius_500.restaurant", "radius_500.cafe"]
 
-    response = client.chat.completions.create(
+    params = OpenAIChatRequestDTO(
         messages=[
             {"role": "system", "content": PARAMETER_MATCHING_PROMPT},
             {"role": "user", "content": user_message},
         ],
-        **PARAMETER_MATCHING_CONFIG,
+        max_completion_tokens=80,
+        temperature=0.0,
     )
 
+    response = openai_service.openai_conn(params)
     raw = response.choices[0].message.content
 
     try:
