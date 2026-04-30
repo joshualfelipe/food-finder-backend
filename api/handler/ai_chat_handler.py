@@ -1,4 +1,4 @@
-from prompt_chat import PARAMETER_MATCHING_PROMPT, ALL_VALID_FEATURES
+from prompt import PARAMETER_MATCHING_PROMPT, ALL_VALID_FEATURES
 from service import openai_service
 import json
 from dto.openai_dto import OpenAIChatRequestDTO

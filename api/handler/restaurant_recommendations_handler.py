@@ -1,10 +1,10 @@
 from dto.recommendations_dto import (
     PlacesRequest,
-    FourSquarePlacesRequest,
     Place,
     RestaurantRecommendationsResponse,
     PlacesFilter,
 )
+from dto.fsq_dto import FourSquarePlacesRequest
 import httpx
 from config import settings
 from handler import ai_recommendations_handler

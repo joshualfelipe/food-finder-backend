@@ -1,5 +1,5 @@
 from config import settings
-from dto.recommendations_dto import FourSquarePlacesRequest
+from dto.fsq_dto import FourSquarePlacesRequest
 import httpx
 
 

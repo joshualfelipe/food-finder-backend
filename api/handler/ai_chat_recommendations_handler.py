@@ -1,7 +1,9 @@
+from openai import OpenAI
+from config import settings
 import json
-from prompt import AI_RECOMMENDATION_PROMPT
-from service import openai_service
-from dto.openai_dto import OpenAIChatRequestDTO
+from prompt import SYSTEM_PROMPT
+
+client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
 def chat_food_recommendations(
@@ -14,11 +16,13 @@ def chat_food_recommendations(
         restaurant_data, formatted_chat_history, user_message
     )
 
-    params = OpenAIChatRequestDTO(
-        messages=messages, max_completion_tokens=500, temperature=0.7
+    response = client.chat.completions.create(
+        model="gpt-5.4-nano",
+        messages=messages,
+        response_format={"type": "json_object"},
+        max_completion_tokens=500,
+        temperature=0.7,
     )
-
-    response = openai_service.openai_conn(params)
 
     raw_content = response.choices[0].message.content or "{}"
 
@@ -46,7 +50,7 @@ def format_ai_chat_prompt(
     restaurant_data: list, formatted_chat_history: list, user_message: str
 ) -> list:
     return [
-        {"role": "developer", "content": AI_RECOMMENDATION_PROMPT},
+        {"role": "developer", "content": SYSTEM_PROMPT},
         *formatted_chat_history,
         {
             "role": "user",
