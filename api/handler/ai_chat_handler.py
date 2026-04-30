@@ -26,8 +26,6 @@ def resolve_search_parameters(user_message: str) -> list[str]:
 
     raw = response.choices[0].message.content
 
-    print(raw)
-
     try:
         parsed = json.loads(raw)
         features = parsed.get("features", [])
