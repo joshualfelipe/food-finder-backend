@@ -7,14 +7,15 @@ The project uses a layered architecture to separate routing, business logic, and
 
 ```plaintext
 food-finder-backend/
-├── api/
-│   ├── main.py                  # FastAPI application entry point
-│   ├── controller/              # HTTP routes and router registration
-│   ├── handler/                 # Application/business logic
-│   ├── repository/              # Data access layer
-│   ├── dto/                     # Request and response models
-│   ├── tests/                   # API and unit tests
-│   └── __init__.py
+├── main.py                      # FastAPI application entry point
+├── config.py                    # Settings (reads .env from project root)
+├── controller/                  # HTTP routes and router registration
+├── handler/                     # Application/business logic
+├── repository/                  # Data access layer
+├── service/                     # Outbound calls to third-party APIs
+├── dto/                         # Request and response models
+├── prompt.py                    # AI prompt templates
+├── tests/                       # API and unit tests
 ├── requirements.txt             # Python dependencies
 └── README.md
 ```
@@ -32,7 +33,6 @@ pip install -r requirements.txt
 From the project root:
 
 ```bash
-cd api
 python3 -m uvicorn main:app --reload
 ```
 
@@ -43,6 +43,5 @@ Server URL: `http://127.0.0.1:8000`
 From the project root:
 
 ```bash
-cd api
 python -m pytest tests
 ```
