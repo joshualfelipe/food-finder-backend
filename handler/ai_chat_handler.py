@@ -4,8 +4,11 @@ from service import openai_service
 import json
 
 
-def resolve_search_parameters(user_message: str) -> list[str]:
+def resolve_search_parameters(user_message: str | None) -> list[str]:
     DEFAULT_FEATURES = ["radius_500.restaurant", "radius_500.cafe"]
+
+    if not user_message:
+        return DEFAULT_FEATURES
 
     params = OpenAIChatRequestDTO(
         messages=[
