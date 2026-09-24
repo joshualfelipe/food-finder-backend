@@ -1,18 +1,19 @@
 from dto.openai_dto import OpenAIChatRequestDTO
+from dto.conversation_dto import MessageResponse
+from typing import List
 import json
 from prompt import AI_RECOMMENDATION_PROMPT
 from service import openai_service
 
 
 def chat_food_recommendations(
-    user_message: str, restaurant_data: list, conversation_history: list | None = None
+    restaurant_data: list,
+    message_history: List[MessageResponse] | None,
+    message: MessageResponse,
 ):
-    # TODO: Implement conversation history
-    formatted_chat_history = format_conversation_history(conversation_history)
+    formatted_chat_history = format_conversation_history(message_history)
 
-    messages = format_ai_chat_prompt(
-        restaurant_data, formatted_chat_history, user_message
-    )
+    messages = format_ai_chat_prompt(restaurant_data, formatted_chat_history, message)
 
     params = OpenAIChatRequestDTO(
         messages=messages, max_completion_tokens=500, temperature=0.7
@@ -34,22 +35,31 @@ def chat_food_recommendations(
     return result, formatted_chat_history
 
 
-def format_conversation_history(conversation_history: list | None) -> list:
+def format_conversation_history(
+    conversation_history: List[MessageResponse] | None,
+) -> list:
     if conversation_history is None:
         return []
 
-    # Keep memory small (token optimization)
-    return conversation_history[-6:]
+    message_history = []
+    for message in conversation_history:
+        message_history.append(
+            {
+                "role": message.role if message.role == "user" else "assistant",
+                "content": message.content,
+            }
+        )
+    return message_history[-6:]
 
 
 def format_ai_chat_prompt(
-    restaurant_data: list, formatted_chat_history: list, user_message: str
+    restaurant_data: list, formatted_chat_history: list, message: str
 ) -> list:
     return [
         {"role": "developer", "content": AI_RECOMMENDATION_PROMPT},
         *formatted_chat_history,
         {
             "role": "user",
-            "content": f"User Query: {user_message}\nAvailable Restaurants (SOURCE OF TRUTH):\n{json.dumps(restaurant_data, ensure_ascii=False)}",
+            "content": f"User Query: {message}\nAvailable Restaurants (SOURCE OF TRUTH):\n{json.dumps(restaurant_data, ensure_ascii=False)}",
         },
     ]
