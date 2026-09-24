@@ -1,3 +1,4 @@
+import json
 from config import settings
 from dto.geoapify_dto import GeoapifyParamsDTO
 from dto.recommendations_dto import PlacesRequest
@@ -99,11 +100,16 @@ async def recommendations(
                 continue
             ai_recommendations_payload[key] = value
 
+    bot_content = summary
+    if isinstance(ai_recommendations_payload, dict) and ai_recommendations_payload.get("recommendations"):
+        recommended = json.dumps(ai_recommendations_payload["recommendations"], ensure_ascii=False)
+        bot_content = f"{summary}\nRecommended: {recommended}"
+
     conversation_handler.create_message(
         Message(
             thread_id=new_message.thread_id,
             role="bot",
-            content=summary,
+            content=bot_content,
         ),
         user.user_id,
     )

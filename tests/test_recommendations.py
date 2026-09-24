@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
@@ -436,7 +437,8 @@ class TestPlaces:
         bot_message = mock_create_message.call_args_list[1][0][0]
         assert bot_message.role == "bot"
         assert bot_message.thread_id == "thread-xyz"
-        assert bot_message.content == self.ai_response["summary"]
+        recommended = json.dumps(self.ai_response["recommendations"], ensure_ascii=False)
+        assert bot_message.content == f"{self.ai_response['summary']}\nRecommended: {recommended}"
 
     @pytest.mark.asyncio
     async def test_no_match_ai_response_still_populates_summary(self, client, mocker):
