@@ -9,5 +9,5 @@ def start_conversation(message: Message, user_id: str) -> MessageResponse:
     return conversation_repository.save_message(message)
 
 
-def get_messages(thread_id: str) -> List[MessageResponse]:
-    return conversation_repository.get_messages_from_thread(thread_id)
+def get_messages(thread_id: str, role: str | None) -> List[MessageResponse]:
+    return conversation_repository.get_messages_from_thread(thread_id, role)

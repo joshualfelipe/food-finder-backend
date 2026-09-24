@@ -1,3 +1,4 @@
+from fastapi import Query
 from dto.conversation_dto import Message, MessageResponse
 from service import supabase_client
 from datetime import datetime, timezone
@@ -42,16 +43,18 @@ def save_message(message: Message) -> MessageResponse:
     return MessageResponse.model_validate(message_response.data[0])
 
 
-def get_messages_from_thread(thread_id: str) -> List[MessageResponse]:
-    response = (
+def get_messages_from_thread(thread_id: str, role: str | None) -> List[MessageResponse]:
+    query = (
         supabase_client.client.table("messages")
         .select("*")
         .eq("thread_id", thread_id)
         .is_("deleted_at", None)
-        .order("created_at", desc=True)
-        .limit(20)
-        .execute()
     )
+
+    if role:
+        query.eq("role", role)
+
+    response = query.order("created_at", desc=True).limit(20).execute()
 
     messages = [MessageResponse.model_validate(row) for row in response.data]
     return list(reversed(messages))

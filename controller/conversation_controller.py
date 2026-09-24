@@ -18,5 +18,9 @@ async def send_message(
 
 
 @router.get("/get_messages")
-async def get_messages(thread_id: str, user: MeResponseDTO = Depends(get_current_user)):
-    return conversation_handler.get_messages(thread_id)
+async def get_messages(
+    thread_id: str,
+    role: str | None = None,
+    user: MeResponseDTO = Depends(get_current_user),
+):
+    return conversation_handler.get_messages(thread_id, role)
