@@ -1,7 +1,27 @@
+from types import SimpleNamespace
+
 from fastapi.testclient import TestClient
+from handler import restaurant_recommendations_handler
 from main import app
 import httpx
 import pytest
+
+
+def _feature(name, lat, lon, cuisine="mixed", categories=None, takeaway=None):
+    return {
+        "properties": {
+            "name": name,
+            "lat": lat,
+            "lon": lon,
+            "catering": {"cuisine": cuisine} if cuisine is not None else {},
+            "categories": categories or ["catering.restaurant"],
+            "facilities": {"takeaway": takeaway} if takeaway is not None else {},
+        }
+    }
+
+
+def _thread(thread_id="thread-123"):
+    return SimpleNamespace(thread_id=thread_id)
 
 
 class TestPlaces:
@@ -9,10 +29,37 @@ class TestPlaces:
     longitude = 120.99698460538839
     user_message = "I'm looking for a cheap fast food restaurant"
 
-    ai_recommendation = {
-        "name": "Budget Bites",
-        "reason": "Budget Bites offers affordable meals that are perfect for those looking for a quick and cheap dining option.",
+    ai_response = {
+        "recommendations": [
+            {
+                "name": "Budget Bites",
+                "reason": "Budget Bites offers affordable meals that are perfect for those looking for a quick and cheap dining option.",
+            }
+        ],
+        "summary": "Found a solid, cheap fast food spot close by.",
     }
+
+    def _mock_conversation_handler(self, mocker, thread_id="thread-123"):
+        return mocker.patch(
+            "handler.restaurant_recommendations_handler.conversation_handler.create_message",
+            return_value=_thread(thread_id),
+        )
+
+    def _mock_ai_recommendations(self, mocker, response=None):
+        return mocker.patch(
+            "handler.restaurant_recommendations_handler.ai_recommendations_handler.chat_food_recommendations",
+            return_value=response if response is not None else self.ai_response,
+        )
+
+    def _url(self, **overrides):
+        params = {
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "user_message": self.user_message,
+        }
+        params.update(overrides)
+        query = "&".join(f"{key}={value}" for key, value in params.items() if value is not None)
+        return f"/recommendations?{query}"
 
     @pytest.mark.asyncio
     async def test_places_with_one_result(self, client, mocker):
@@ -23,63 +70,45 @@ class TestPlaces:
                 return {
                     "features": [
                         {"properties": {"name": "Origin Point"}},
-                        {
-                            "properties": {
-                                "name": "Budget Bites",
-                                "lat": 14.4735,
-                                "lon": 120.9975,
-                                "catering": {"cuisine": "burger"},
-                                "categories": ["catering.restaurant"],
-                                "facilities": {"takeaway": True},
-                            }
-                        },
+                        _feature(
+                            "Budget Bites",
+                            14.4735,
+                            120.9975,
+                            cuisine="burger",
+                            takeaway=True,
+                        ),
                     ]
                 }
-
-        def mock_resolve_search_parameters(*args, **kwargs):
-            return ["catering.restaurant"]
 
         async def mock_geoapify_conn(*args, **kwargs):
             return MockGeoapifyResponse()
 
-        def mock_chat_food_recommendations(*args, **kwargs):
-            return self.ai_recommendation, []
-
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_chat_handler.resolve_search_parameters",
-            new=mock_resolve_search_parameters,
-        )
+        self._mock_conversation_handler(mocker)
         mocker.patch(
             "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
             new=mock_geoapify_conn,
         )
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_recommendations_handler.chat_food_recommendations",
-            new=mock_chat_food_recommendations,
-        )
+        self._mock_ai_recommendations(mocker)
 
-        response = client.get(
-            f"/recommendations?latitude={self.latitude}&longitude={self.longitude}&user_message={self.user_message}"
-        )
+        response = client.get(self._url())
 
         assert response.status_code == 200
         data = response.json()
 
-        # Test for the AI recommendation content
-        assert data["ai_recommendations"]["name"] == "Budget Bites"
-        assert (
-            data["ai_recommendations"]["reason"]
-            == "Budget Bites offers affordable meals that are perfect for those looking for a quick and cheap dining option."
-        )
+        assert data["thread_id"] == "thread-123"
+        assert data["summary"] == self.ai_response["summary"]
+        assert data["ai_recommendations"] == {
+            "recommendations": self.ai_response["recommendations"]
+        }
 
-        # Test for the restaurant details returned
         assert data["restaurants"][0]["name"] == "Budget Bites"
         assert data["restaurants"][0]["catering_cuisine"] == "burger"
-        assert data["restaurants"][0]["categories"] == ["catering.restaurant"]
-        assert data["restaurants"][0]["facilities_takeaway"] is True
+        assert data["restaurants"][0]["latitude"] == 14.4735
+        assert data["restaurants"][0]["longitude"] == 120.9975
         assert data["restaurants"][0]["distance_m"] > 0
+        assert "categories" not in data["restaurants"][0]
+        assert "facilities_takeaway" not in data["restaurants"][0]
 
-        # Test for the count of restaurants returned
         assert data["count"] == 1
 
     @pytest.mark.asyncio
@@ -89,61 +118,30 @@ class TestPlaces:
                 return {
                     "features": [
                         {"properties": {"name": "Origin Point"}},
-                        {
-                            "properties": {
-                                "name": "Budget Bites",
-                                "lat": 14.4735,
-                                "lon": 120.9975,
-                                "catering": {"cuisine": "burger"},
-                                "categories": ["catering.restaurant"],
-                                "facilities": {"takeaway": True},
-                            }
-                        },
-                        {
-                            "properties": {
-                                "name": "Second Spot",
-                                "lat": 14.474,
-                                "lon": 120.998,
-                                "catering": {"cuisine": "pizza"},
-                                "categories": ["catering.restaurant"],
-                                "facilities": {"takeaway": False},
-                            }
-                        },
-                        {
-                            "properties": {
-                                "name": "Third Place",
-                                "lat": 14.475,
-                                "lon": 120.999,
-                                "catering": {"cuisine": "coffee"},
-                                "categories": ["catering.cafe"],
-                                "facilities": {"takeaway": True},
-                            }
-                        },
+                        _feature("Budget Bites", 14.4735, 120.9975, cuisine="burger", takeaway=True),
+                        _feature("Second Spot", 14.474, 120.998, cuisine="pizza", takeaway=False),
+                        _feature(
+                            "Third Place",
+                            14.475,
+                            120.999,
+                            cuisine="coffee",
+                            categories=["catering.cafe"],
+                            takeaway=True,
+                        ),
                     ]
                 }
 
         async def mock_geoapify_conn(*args, **kwargs):
             return MockGeoapifyResponse()
 
-        def mock_chat_food_recommendations(*args, **kwargs):
-            return self.ai_recommendation, []
-
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_chat_handler.resolve_search_parameters",
-            return_value=["catering.restaurant"],
-        )
+        self._mock_conversation_handler(mocker)
         mocker.patch(
             "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
             new=mock_geoapify_conn,
         )
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_recommendations_handler.chat_food_recommendations",
-            new=mock_chat_food_recommendations,
-        )
+        self._mock_ai_recommendations(mocker)
 
-        response = client.get(
-            f"/recommendations?latitude={self.latitude}&longitude={self.longitude}&user_message={self.user_message}"
-        )
+        response = client.get(self._url())
 
         assert response.status_code == 200
         data = response.json()
@@ -167,47 +165,57 @@ class TestPlaces:
                                 "catering": {"cuisine": "burger"},
                             }
                         },
-                        {
-                            "properties": {
-                                "name": "Budget Bites",
-                                "lat": 14.474,
-                                "lon": 120.998,
-                                "catering": {"cuisine": "burger"},
-                                "categories": ["catering.restaurant"],
-                                "facilities": {"takeaway": True},
-                            }
-                        },
+                        _feature("Budget Bites", 14.474, 120.998, cuisine="burger", takeaway=True),
                     ]
                 }
 
         async def mock_geoapify_conn(*args, **kwargs):
             return MockGeoapifyResponse()
 
-        def mock_chat_food_recommendations(*args, **kwargs):
-            return self.ai_recommendation, []
-
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_chat_handler.resolve_search_parameters",
-            return_value=["catering.restaurant"],
-        )
+        self._mock_conversation_handler(mocker)
         mocker.patch(
             "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
             new=mock_geoapify_conn,
         )
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_recommendations_handler.chat_food_recommendations",
-            new=mock_chat_food_recommendations,
-        )
+        self._mock_ai_recommendations(mocker)
 
-        response = client.get(
-            f"/recommendations?latitude={self.latitude}&longitude={self.longitude}&user_message={self.user_message}"
-        )
+        response = client.get(self._url())
 
         assert response.status_code == 200
         data = response.json()
 
         assert data["count"] == 1
         assert data["restaurants"][0]["name"] == "Budget Bites"
+
+    @pytest.mark.asyncio
+    async def test_places_deduplicates_by_name(self, client, mocker):
+        class MockGeoapifyResponse:
+            def json(self):
+                return {
+                    "features": [
+                        {"properties": {"name": "Origin Point"}},
+                        _feature("Budget Bites", 14.4735, 120.9975, cuisine="burger"),
+                        _feature("Budget Bites", 14.5, 121.02, cuisine="burger"),
+                    ]
+                }
+
+        async def mock_geoapify_conn(*args, **kwargs):
+            return MockGeoapifyResponse()
+
+        self._mock_conversation_handler(mocker)
+        mocker.patch(
+            "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
+            new=mock_geoapify_conn,
+        )
+        self._mock_ai_recommendations(mocker)
+
+        response = client.get(self._url())
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["count"] == 1
+        assert data["restaurants"][0]["latitude"] == 14.4735
 
     @pytest.mark.asyncio
     async def test_places_with_only_origin_point_returns_zero_count(self, client, mocker):
@@ -218,25 +226,14 @@ class TestPlaces:
         async def mock_geoapify_conn(*args, **kwargs):
             return MockGeoapifyResponse()
 
-        def mock_chat_food_recommendations(*args, **kwargs):
-            return self.ai_recommendation, []
-
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_chat_handler.resolve_search_parameters",
-            return_value=["catering.restaurant"],
-        )
+        self._mock_conversation_handler(mocker)
         mocker.patch(
             "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
             new=mock_geoapify_conn,
         )
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_recommendations_handler.chat_food_recommendations",
-            new=mock_chat_food_recommendations,
-        )
+        self._mock_ai_recommendations(mocker)
 
-        response = client.get(
-            f"/recommendations?latitude={self.latitude}&longitude={self.longitude}&user_message={self.user_message}"
-        )
+        response = client.get(self._url())
 
         assert response.status_code == 200
         data = response.json()
@@ -253,25 +250,14 @@ class TestPlaces:
         async def mock_geoapify_conn(*args, **kwargs):
             return MockGeoapifyResponse()
 
-        def mock_chat_food_recommendations(*args, **kwargs):
-            return self.ai_recommendation, []
-
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_chat_handler.resolve_search_parameters",
-            return_value=["catering.restaurant"],
-        )
+        self._mock_conversation_handler(mocker)
         mocker.patch(
             "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
             new=mock_geoapify_conn,
         )
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_recommendations_handler.chat_food_recommendations",
-            new=mock_chat_food_recommendations,
-        )
+        self._mock_ai_recommendations(mocker)
 
-        response = client.get(
-            f"/recommendations?latitude={self.latitude}&longitude={self.longitude}&user_message={self.user_message}"
-        )
+        response = client.get(self._url())
 
         assert response.status_code == 200
         data = response.json()
@@ -300,34 +286,85 @@ class TestPlaces:
         async def mock_geoapify_conn(*args, **kwargs):
             return MockGeoapifyResponse()
 
-        def mock_chat_food_recommendations(*args, **kwargs):
-            return self.ai_recommendation, []
-
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_chat_handler.resolve_search_parameters",
-            return_value=["catering.restaurant"],
-        )
+        self._mock_conversation_handler(mocker)
         mocker.patch(
             "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
             new=mock_geoapify_conn,
         )
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_recommendations_handler.chat_food_recommendations",
-            new=mock_chat_food_recommendations,
-        )
+        self._mock_ai_recommendations(mocker)
 
-        response = client.get(
-            f"/recommendations?latitude={self.latitude}&longitude={self.longitude}&user_message={self.user_message}"
-        )
+        response = client.get(self._url())
 
         assert response.status_code == 200
         data = response.json()
 
         assert data["restaurants"][0]["catering_cuisine"] is None
-        assert data["restaurants"][0]["facilities_takeaway"] is None
 
     @pytest.mark.asyncio
-    async def test_places_without_user_message_skips_openai_parameter_matching(self, client, mocker):
+    async def test_geoapify_queried_with_fixed_wide_features_regardless_of_message(self, client, mocker):
+        class MockGeoapifyResponse:
+            def json(self):
+                return {"features": [{"properties": {"name": "Origin Point"}}]}
+
+        captured = {}
+
+        async def mock_geoapify_conn(params):
+            captured["params"] = params
+            return MockGeoapifyResponse()
+
+        self._mock_conversation_handler(mocker)
+        mocker.patch(
+            "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
+            new=mock_geoapify_conn,
+        )
+        self._mock_ai_recommendations(mocker)
+
+        response = client.get(
+            self._url(user_message="surprise me with something exotic")
+        )
+
+        assert response.status_code == 200
+        assert captured["params"].features == restaurant_recommendations_handler.WIDEST_FEATURES
+
+    @pytest.mark.asyncio
+    async def test_ai_candidates_are_capped_to_nearest_max_and_sorted(self, client, mocker):
+        max_candidates = restaurant_recommendations_handler.MAX_AI_CANDIDATES
+        total = max_candidates + 5
+        features = [{"properties": {"name": "Origin Point"}}] + [
+            _feature(f"Restaurant {i}", self.latitude, self.longitude + (i + 1) * 0.001)
+            for i in range(total)
+        ]
+
+        class MockGeoapifyResponse:
+            def json(self):
+                return {"features": features}
+
+        async def mock_geoapify_conn(*args, **kwargs):
+            return MockGeoapifyResponse()
+
+        self._mock_conversation_handler(mocker)
+        mocker.patch(
+            "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
+            new=mock_geoapify_conn,
+        )
+        mock_chat = self._mock_ai_recommendations(mocker)
+
+        response = client.get(self._url())
+
+        assert response.status_code == 200
+        assert response.json()["count"] == total
+
+        ai_restaurant_data = mock_chat.call_args[0][0]
+        assert len(ai_restaurant_data) == max_candidates
+
+        distances = [r["distance_m"] for r in ai_restaurant_data]
+        assert distances == sorted(distances)
+        assert set(ai_restaurant_data[0].keys()) == set(
+            restaurant_recommendations_handler.AI_VISIBLE_FIELDS
+        )
+
+    @pytest.mark.asyncio
+    async def test_conversation_history_is_fetched_when_thread_id_provided(self, client, mocker):
         class MockGeoapifyResponse:
             def json(self):
                 return {"features": [{"properties": {"name": "Origin Point"}}]}
@@ -335,23 +372,101 @@ class TestPlaces:
         async def mock_geoapify_conn(*args, **kwargs):
             return MockGeoapifyResponse()
 
-        mock_openai_conn = mocker.patch("handler.ai_chat_handler.openai_service.openai_conn")
-
+        self._mock_conversation_handler(mocker, thread_id="thread-abc")
+        mock_get_messages = mocker.patch(
+            "handler.restaurant_recommendations_handler.conversation_handler.get_messages",
+            return_value=[],
+        )
         mocker.patch(
             "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
             new=mock_geoapify_conn,
         )
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_recommendations_handler.chat_food_recommendations",
-            return_value=(self.ai_recommendation, []),
-        )
+        self._mock_ai_recommendations(mocker)
 
-        response = client.get(
-            f"/recommendations?latitude={self.latitude}&longitude={self.longitude}"
-        )
+        response = client.get(self._url(thread_id="thread-abc"))
 
         assert response.status_code == 200
-        mock_openai_conn.assert_not_called()
+        mock_get_messages.assert_called_once_with("thread-abc")
+
+    @pytest.mark.asyncio
+    async def test_conversation_history_not_fetched_without_thread_id(self, client, mocker):
+        class MockGeoapifyResponse:
+            def json(self):
+                return {"features": [{"properties": {"name": "Origin Point"}}]}
+
+        async def mock_geoapify_conn(*args, **kwargs):
+            return MockGeoapifyResponse()
+
+        self._mock_conversation_handler(mocker)
+        mock_get_messages = mocker.patch(
+            "handler.restaurant_recommendations_handler.conversation_handler.get_messages",
+        )
+        mocker.patch(
+            "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
+            new=mock_geoapify_conn,
+        )
+        self._mock_ai_recommendations(mocker)
+
+        response = client.get(self._url())
+
+        assert response.status_code == 200
+        mock_get_messages.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_bot_reply_is_saved_to_conversation_with_summary(self, client, mocker):
+        class MockGeoapifyResponse:
+            def json(self):
+                return {"features": [{"properties": {"name": "Origin Point"}}]}
+
+        async def mock_geoapify_conn(*args, **kwargs):
+            return MockGeoapifyResponse()
+
+        mock_create_message = self._mock_conversation_handler(mocker, thread_id="thread-xyz")
+        mocker.patch(
+            "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
+            new=mock_geoapify_conn,
+        )
+        self._mock_ai_recommendations(mocker)
+
+        response = client.get(self._url())
+
+        assert response.status_code == 200
+        assert mock_create_message.call_count == 2
+
+        bot_message = mock_create_message.call_args_list[1][0][0]
+        assert bot_message.role == "bot"
+        assert bot_message.thread_id == "thread-xyz"
+        assert bot_message.content == self.ai_response["summary"]
+
+    @pytest.mark.asyncio
+    async def test_no_match_ai_response_still_populates_summary(self, client, mocker):
+        class MockGeoapifyResponse:
+            def json(self):
+                return {"features": [{"properties": {"name": "Origin Point"}}]}
+
+        async def mock_geoapify_conn(*args, **kwargs):
+            return MockGeoapifyResponse()
+
+        self._mock_conversation_handler(mocker)
+        mocker.patch(
+            "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
+            new=mock_geoapify_conn,
+        )
+        self._mock_ai_recommendations(
+            mocker,
+            response={
+                "error": "no_match",
+                "message": "Nothing nearby fits that well right now — want me to broaden the search?",
+            },
+        )
+
+        response = client.get(self._url())
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["summary"] == "Nothing nearby fits that well right now — want me to broaden the search?"
+        assert data["ai_recommendations"] == {"error": "no_match"}
 
     def test_places_missing_query_params_returns_422(self, client):
         response = client.get("/recommendations")
@@ -362,18 +477,13 @@ class TestPlaces:
         async def mock_geoapify_conn_raises(*args, **kwargs):
             raise httpx.ConnectTimeout("boom")
 
-        mocker.patch(
-            "handler.restaurant_recommendations_handler.ai_chat_handler.resolve_search_parameters",
-            return_value=["catering.restaurant"],
-        )
+        self._mock_conversation_handler(mocker)
         mocker.patch(
             "handler.restaurant_recommendations_handler.geoapify_service.geoapify_conn",
             new=mock_geoapify_conn_raises,
         )
 
         local_client = TestClient(app, raise_server_exceptions=False)
-        response = local_client.get(
-            f"/recommendations?latitude={self.latitude}&longitude={self.longitude}&user_message={self.user_message}"
-        )
+        response = local_client.get(self._url())
 
         assert response.status_code == 500
