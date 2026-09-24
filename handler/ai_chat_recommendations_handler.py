@@ -43,7 +43,7 @@ def format_conversation_history(conversation_history: list | None) -> list:
         return []
 
     # Keep memory small (token optimization)
-    return conversation_history[-6:]
+    return conversation_history[-10:]
 
 
 def format_ai_chat_prompt(
