@@ -14,7 +14,7 @@ async def send_message(
     # User is logged in so set role to user message
     message.role = "user"
 
-    return conversation_handler.start_conversation(message, user.user_id)
+    return conversation_handler.create_message(message, user.user_id)
 
 
 @router.get("/get_messages")

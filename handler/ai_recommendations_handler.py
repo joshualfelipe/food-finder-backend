@@ -1,21 +1,22 @@
 from dto.openai_dto import OpenAIChatRequestDTO
+from dto.conversation_dto import MessageResponse
+from typing import List
 import json
 from prompt import AI_RECOMMENDATION_PROMPT
 from service import openai_service
 
 
 def chat_food_recommendations(
-    user_message: str, restaurant_data: list, conversation_history: list | None = None
+    restaurant_data: list,
+    message_history: List[MessageResponse] | None,
+    message: MessageResponse,
 ):
-    # TODO: Implement conversation history
-    formatted_chat_history = format_conversation_history(conversation_history)
+    formatted_chat_history = format_conversation_history(message_history)
 
-    messages = format_ai_chat_prompt(
-        restaurant_data, formatted_chat_history, user_message
-    )
+    messages = format_ai_chat_prompt(restaurant_data, formatted_chat_history, message)
 
     params = OpenAIChatRequestDTO(
-        messages=messages, max_completion_tokens=500, temperature=0.7
+        messages=messages, max_completion_tokens=600, temperature=0.7
     )
 
     response = openai_service.openai_conn(params)
@@ -27,29 +28,47 @@ def chat_food_recommendations(
             json.loads(raw_content) if isinstance(raw_content, str) else raw_content
         )
     except json.JSONDecodeError:
-        # If the model somehow returned invalid JSON, keep it machine-readable for the API.
         result = {"error": "invalid_ai_json", "raw": raw_content}
 
-    # TODO: Implement conversation history
-    return result, formatted_chat_history
+    return result
 
 
-def format_conversation_history(conversation_history: list | None) -> list:
+def extract_chat_text(ai_response: dict) -> str:
+    if isinstance(ai_response, dict):
+        summary = ai_response.get("summary")
+        if summary:
+            return summary
+        message = ai_response.get("message")
+        if message:
+            return message
+    return json.dumps(ai_response)
+
+
+def format_conversation_history(
+    conversation_history: List[MessageResponse] | None,
+) -> list:
     if conversation_history is None:
         return []
 
-    # Keep memory small (token optimization)
-    return conversation_history[-6:]
+    message_history = []
+    for message in conversation_history:
+        message_history.append(
+            {
+                "role": message.role if message.role == "user" else "assistant",
+                "content": message.content,
+            }
+        )
+    return message_history[-6:]
 
 
 def format_ai_chat_prompt(
-    restaurant_data: list, formatted_chat_history: list, user_message: str
+    restaurant_data: list, formatted_chat_history: list, message: MessageResponse
 ) -> list:
     return [
         {"role": "developer", "content": AI_RECOMMENDATION_PROMPT},
         *formatted_chat_history,
         {
             "role": "user",
-            "content": f"User Query: {user_message}\nAvailable Restaurants (SOURCE OF TRUTH):\n{json.dumps(restaurant_data, ensure_ascii=False)}",
+            "content": f"User Query: {message.content}\nAvailable Restaurants (SOURCE OF TRUTH):\n{json.dumps(restaurant_data, ensure_ascii=False)}",
         },
     ]
