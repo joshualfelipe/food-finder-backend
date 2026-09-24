@@ -31,8 +31,7 @@ def chat_food_recommendations(
         # If the model somehow returned invalid JSON, keep it machine-readable for the API.
         result = {"error": "invalid_ai_json", "raw": raw_content}
 
-    # TODO: Implement conversation history
-    return result, formatted_chat_history
+    return result
 
 
 def format_conversation_history(
@@ -53,13 +52,13 @@ def format_conversation_history(
 
 
 def format_ai_chat_prompt(
-    restaurant_data: list, formatted_chat_history: list, message: str
+    restaurant_data: list, formatted_chat_history: list, message: MessageResponse
 ) -> list:
     return [
         {"role": "developer", "content": AI_RECOMMENDATION_PROMPT},
         *formatted_chat_history,
         {
             "role": "user",
-            "content": f"User Query: {message}\nAvailable Restaurants (SOURCE OF TRUTH):\n{json.dumps(restaurant_data, ensure_ascii=False)}",
+            "content": f"User Query: {message.content}\nAvailable Restaurants (SOURCE OF TRUTH):\n{json.dumps(restaurant_data, ensure_ascii=False)}",
         },
     ]

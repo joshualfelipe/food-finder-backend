@@ -5,15 +5,14 @@ from dto.conversation_dto import Message
 from handler import ai_recommendations_handler, ai_chat_handler, conversation_handler
 from haversine import haversine, Unit
 from service import geoapify_service
-from controller.auth_controller import get_current_user
 from dto.auth_dto import MeResponseDTO
-from fastapi import Depends
+import json
 
 
 async def recommendations(
     request: PlacesRequest,
     message: Message,
-    user: MeResponseDTO = Depends(get_current_user),
+    user: MeResponseDTO,
 ):
     if message.thread_id:
         message_history = conversation_handler.get_messages(message.thread_id)
@@ -60,8 +59,17 @@ async def recommendations(
 
         restaurants.append(restaurant_data)
 
-    ai_response, _ = ai_recommendations_handler.chat_food_recommendations(
+    ai_response = ai_recommendations_handler.chat_food_recommendations(
         restaurants, message_history, new_message
+    )
+
+    conversation_handler.create_message(
+        Message(
+            thread_id=new_message.thread_id,
+            role="bot",
+            content=json.dumps(ai_response),
+        ),
+        user.user_id,
     )
 
     return {
@@ -69,4 +77,5 @@ async def recommendations(
         "restaurants": restaurants,
         "count": len(restaurants),
         "message": "Recommendations fetched successfully.",
+        "thread_id": new_message.thread_id,
     }

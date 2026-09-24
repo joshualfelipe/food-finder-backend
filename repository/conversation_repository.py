@@ -54,7 +54,7 @@ def get_messages_from_thread(thread_id: str, role: str | None) -> List[MessageRe
     if role:
         query.eq("role", role)
 
-    response = query.order("created_at", desc=False).limit(20).execute()
+    response = query.order("created_at", desc=True).limit(20).execute()
 
     messages = [MessageResponse.model_validate(row) for row in response.data]
     return list(reversed(messages))
