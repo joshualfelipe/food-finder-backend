@@ -58,11 +58,13 @@ async def recommendations(
     user: MeResponseDTO,
 ):
     message_history = (
-        conversation_handler.get_messages(message.thread_id)
+        conversation_handler.get_messages(message.thread_id, user.user_id)
         if message.thread_id
         else None
     )
-    new_message = conversation_handler.create_message(message, user.user_id)
+    new_message = conversation_handler.create_message(
+        message, user.user_id, verify_owner=False
+    )
 
     params = GeoapifyParamsDTO(
         lat=request.latitude,
@@ -83,7 +85,9 @@ async def recommendations(
         seen_names.add(restaurant["name"])
         restaurants.append(restaurant)
 
-    ai_candidates = sorted(restaurants, key=lambda r: r["distance_m"])[:MAX_AI_CANDIDATES]
+    ai_candidates = sorted(restaurants, key=lambda r: r["distance_m"])[
+        :MAX_AI_CANDIDATES
+    ]
     ai_restaurant_data = [
         {field: restaurant[field] for field in AI_VISIBLE_FIELDS}
         for restaurant in ai_candidates
@@ -101,8 +105,12 @@ async def recommendations(
             ai_recommendations_payload[key] = value
 
     bot_content = summary
-    if isinstance(ai_recommendations_payload, dict) and ai_recommendations_payload.get("recommendations"):
-        recommended = json.dumps(ai_recommendations_payload["recommendations"], ensure_ascii=False)
+    if isinstance(ai_recommendations_payload, dict) and ai_recommendations_payload.get(
+        "recommendations"
+    ):
+        recommended = json.dumps(
+            ai_recommendations_payload["recommendations"], ensure_ascii=False
+        )
         bot_content = f"{summary}\nRecommended: {recommended}"
 
     conversation_handler.create_message(
@@ -112,6 +120,7 @@ async def recommendations(
             content=bot_content,
         ),
         user.user_id,
+        verify_owner=False,
     )
 
     client_restaurants = [

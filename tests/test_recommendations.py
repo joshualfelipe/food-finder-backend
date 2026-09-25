@@ -387,7 +387,7 @@ class TestPlaces:
         response = client.get(self._url(thread_id="thread-abc"))
 
         assert response.status_code == 200
-        mock_get_messages.assert_called_once_with("thread-abc")
+        mock_get_messages.assert_called_once_with("thread-abc", "test-user-id")
 
     @pytest.mark.asyncio
     async def test_conversation_history_not_fetched_without_thread_id(self, client, mocker):

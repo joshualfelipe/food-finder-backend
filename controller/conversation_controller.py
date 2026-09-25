@@ -23,4 +23,4 @@ async def get_messages(
     role: str | None = None,
     user: MeResponseDTO = Depends(get_current_user),
 ):
-    return conversation_handler.get_messages(thread_id, role)
+    return conversation_handler.get_messages(thread_id, user.user_id, role)
