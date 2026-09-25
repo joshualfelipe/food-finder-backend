@@ -8,7 +8,9 @@ from haversine import haversine, Unit
 from service import geoapify_service
 from dto.auth_dto import MeResponseDTO
 
-WIDEST_FEATURES = ["drive_15.restaurant", "drive_15.cafe"]
+PLACE_CATEGORIES = "catering.restaurant,catering.cafe,catering.fast_food"
+SEARCH_RADIUS_M = 5000
+PLACE_LIMIT = 200
 
 AI_VISIBLE_FIELDS = (
     "name",
@@ -66,14 +68,17 @@ async def recommendations(
         message, user.user_id, verify_owner=False
     )
 
+    # Geoapify expects lon,lat order here
+    lon_lat = f"{request.longitude},{request.latitude}"
     params = GeoapifyParamsDTO(
-        lat=request.latitude,
-        lon=request.longitude,
-        features=WIDEST_FEATURES,
+        categories=PLACE_CATEGORIES,
+        filter=f"circle:{lon_lat},{SEARCH_RADIUS_M}",
+        bias=f"proximity:{lon_lat}",
+        limit=PLACE_LIMIT,
         apiKey=settings.GEOAPIFY_API_KEY,
     )
     response = await geoapify_service.geoapify_conn(params)
-    place_features = response.json().get("features", [])[1:]
+    place_features = response.json().get("features", [])
     origin = (request.latitude, request.longitude)
 
     restaurants = []

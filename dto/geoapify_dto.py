@@ -1,9 +1,9 @@
 from pydantic import BaseModel
-from typing import List
 
 
 class GeoapifyParamsDTO(BaseModel):
-    lat: float
-    lon: float
-    features: List[str]
+    categories: str
+    filter: str
+    bias: str
+    limit: int
     apiKey: str

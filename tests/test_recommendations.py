@@ -70,7 +70,6 @@ class TestPlaces:
             def json(self):
                 return {
                     "features": [
-                        {"properties": {"name": "Origin Point"}},
                         _feature(
                             "Budget Bites",
                             14.4735,
@@ -118,7 +117,6 @@ class TestPlaces:
             def json(self):
                 return {
                     "features": [
-                        {"properties": {"name": "Origin Point"}},
                         _feature("Budget Bites", 14.4735, 120.9975, cuisine="burger", takeaway=True),
                         _feature("Second Spot", 14.474, 120.998, cuisine="pizza", takeaway=False),
                         _feature(
@@ -158,7 +156,6 @@ class TestPlaces:
             def json(self):
                 return {
                     "features": [
-                        {"properties": {"name": "Origin Point"}},
                         {
                             "properties": {
                                 "lat": 14.4735,
@@ -194,7 +191,6 @@ class TestPlaces:
             def json(self):
                 return {
                     "features": [
-                        {"properties": {"name": "Origin Point"}},
                         _feature("Budget Bites", 14.4735, 120.9975, cuisine="burger"),
                         _feature("Budget Bites", 14.5, 121.02, cuisine="burger"),
                     ]
@@ -222,7 +218,7 @@ class TestPlaces:
     async def test_places_with_only_origin_point_returns_zero_count(self, client, mocker):
         class MockGeoapifyResponse:
             def json(self):
-                return {"features": [{"properties": {"name": "Origin Point"}}]}
+                return {"features": []}
 
         async def mock_geoapify_conn(*args, **kwargs):
             return MockGeoapifyResponse()
@@ -272,7 +268,6 @@ class TestPlaces:
             def json(self):
                 return {
                     "features": [
-                        {"properties": {"name": "Origin Point"}},
                         {
                             "properties": {
                                 "name": "No Extras Diner",
@@ -302,10 +297,10 @@ class TestPlaces:
         assert data["restaurants"][0]["catering_cuisine"] is None
 
     @pytest.mark.asyncio
-    async def test_geoapify_queried_with_fixed_wide_features_regardless_of_message(self, client, mocker):
+    async def test_geoapify_queried_with_fixed_categories_regardless_of_message(self, client, mocker):
         class MockGeoapifyResponse:
             def json(self):
-                return {"features": [{"properties": {"name": "Origin Point"}}]}
+                return {"features": []}
 
         captured = {}
 
@@ -325,13 +320,13 @@ class TestPlaces:
         )
 
         assert response.status_code == 200
-        assert captured["params"].features == restaurant_recommendations_handler.WIDEST_FEATURES
+        assert captured["params"].categories == restaurant_recommendations_handler.PLACE_CATEGORIES
 
     @pytest.mark.asyncio
     async def test_ai_candidates_are_capped_to_nearest_max_and_sorted(self, client, mocker):
         max_candidates = restaurant_recommendations_handler.MAX_AI_CANDIDATES
         total = max_candidates + 5
-        features = [{"properties": {"name": "Origin Point"}}] + [
+        features = [
             _feature(f"Restaurant {i}", self.latitude, self.longitude + (i + 1) * 0.001)
             for i in range(total)
         ]
@@ -368,7 +363,7 @@ class TestPlaces:
     async def test_conversation_history_is_fetched_when_thread_id_provided(self, client, mocker):
         class MockGeoapifyResponse:
             def json(self):
-                return {"features": [{"properties": {"name": "Origin Point"}}]}
+                return {"features": []}
 
         async def mock_geoapify_conn(*args, **kwargs):
             return MockGeoapifyResponse()
@@ -393,7 +388,7 @@ class TestPlaces:
     async def test_conversation_history_not_fetched_without_thread_id(self, client, mocker):
         class MockGeoapifyResponse:
             def json(self):
-                return {"features": [{"properties": {"name": "Origin Point"}}]}
+                return {"features": []}
 
         async def mock_geoapify_conn(*args, **kwargs):
             return MockGeoapifyResponse()
@@ -417,7 +412,7 @@ class TestPlaces:
     async def test_bot_reply_is_saved_to_conversation_with_summary(self, client, mocker):
         class MockGeoapifyResponse:
             def json(self):
-                return {"features": [{"properties": {"name": "Origin Point"}}]}
+                return {"features": []}
 
         async def mock_geoapify_conn(*args, **kwargs):
             return MockGeoapifyResponse()
@@ -444,7 +439,7 @@ class TestPlaces:
     async def test_no_match_ai_response_still_populates_summary(self, client, mocker):
         class MockGeoapifyResponse:
             def json(self):
-                return {"features": [{"properties": {"name": "Origin Point"}}]}
+                return {"features": []}
 
         async def mock_geoapify_conn(*args, **kwargs):
             return MockGeoapifyResponse()
