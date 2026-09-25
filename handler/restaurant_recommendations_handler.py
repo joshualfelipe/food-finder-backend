@@ -28,7 +28,7 @@ CLIENT_VISIBLE_FIELDS = (
     "distance_m",
 )
 
-MAX_AI_CANDIDATES = 60
+MAX_AI_CANDIDATES = PLACE_LIMIT
 
 
 def _parse_restaurant(feature: dict, origin: tuple[float, float]) -> dict | None:

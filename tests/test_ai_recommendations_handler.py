@@ -81,7 +81,7 @@ class TestChatFoodRecommendations:
 
         params = mock_openai_conn.call_args[0][0]
         assert params.max_completion_tokens == 600
-        assert params.temperature == 0.7
+        assert params.temperature == 0.3
         assert params.messages[0].role == "developer"
         assert params.messages[-1].role == "user"
         assert "cheap food" in params.messages[-1].content

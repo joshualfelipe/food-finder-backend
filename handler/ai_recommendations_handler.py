@@ -16,7 +16,7 @@ def chat_food_recommendations(
     messages = format_ai_chat_prompt(restaurant_data, formatted_chat_history, message)
 
     params = OpenAIChatRequestDTO(
-        messages=messages, max_completion_tokens=600, temperature=0.7
+        messages=messages, max_completion_tokens=600, temperature=0.3
     )
 
     response = openai_service.openai_conn(params)
